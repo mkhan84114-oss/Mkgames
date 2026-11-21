@@ -1,0 +1,7 @@
+{
+  "appId": "com.mkgames.kinetype",
+  "appName": "KineType Studio",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}

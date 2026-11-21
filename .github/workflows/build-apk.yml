@@ -1,0 +1,55 @@
+name: Build KineType APK
+
+on:
+  push:
+    branches: [kinetype-apk]
+    paths: ['kinetype-app/**', '.github/workflows/build-apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kinetype-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+
+      - name: Install deps and add Android platform
+        run: |
+          npm install
+          npx cap add android
+          npx cap sync android
+
+      - name: Permissions (mic + audio)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />#' $M
+          grep -n "uses-permission" $M
+
+      - name: Build debug APK
+        working-directory: kinetype-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk KineType-Studio.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KineType-Studio-APK
+          path: kinetype-app/KineType-Studio.apk
+
+      - name: Publish release (direct download link)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete kinetype-latest --yes --cleanup-tag || true
+          gh release create kinetype-latest KineType-Studio.apk --title "KineType Studio APK" --notes "Latest build. Install on Android (allow unknown sources)." --target ${{ github.sha }}
